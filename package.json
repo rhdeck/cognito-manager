@@ -1,0 +1,35 @@
+{
+  "name": "@raydeck/cognito-manager",
+  "version": "1.0.0",
+  "description": "",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "rollup -c -m; yarn pack -f package.tgz",
+    "watch": "node watch",
+    "linecount": "wc -l src/*.js | sort"
+  },
+  "author": "",
+  "dependencies": {
+    "@babel/runtime": "^7.8.4",
+    "aws-sdk": "^2.614.0"
+  },
+  "devDependencies": {
+    "@babel/cli": "^7.8.4",
+    "@babel/core": "^7.8.4",
+    "@babel/plugin-proposal-class-properties": "^7.8.3",
+    "@babel/plugin-transform-runtime": "^7.8.3",
+    "@babel/preset-env": "^7.8.4",
+    "@rollup/plugin-commonjs": "^11.0.2",
+    "@rollup/plugin-node-resolve": "^7.1.1",
+    "babel-eslint": "^10.0.3",
+    "babel-plugin-source-map-support": "^2.1.1",
+    "eslint": "^6.8.0",
+    "eslint-plugin-babel": "^5.3.0",
+    "node-watch": "^0.6.3",
+    "rollup": "^1.31.0",
+    "rollup-plugin-auto-external": "^2.0.0",
+    "rollup-plugin-babel": "^4.3.3"
+  }
+}
