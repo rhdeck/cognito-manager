@@ -1,28 +1,33 @@
 import { CognitoIdentityServiceProvider } from "aws-sdk";
-const cidp = new CognitoIdentityServiceProvider();
+let defaultParams = null;
+const setCISPParams = (newParams) => {
+  defaultParams = newParams;
+};
+const getCISP = (params = defaultParams) =>
+  new CognitoIdentityServiceProvider(params);
 function makePassword() {
   return (
     Array(4)
       .fill("0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz")
-      .map(function(x) {
+      .map(function (x) {
         return x[Math.floor(Math.random() * x.length)];
       })
       .join("") +
     Array(2)
       .fill("ABCDEFGHIJKLMNOPQRSTUVWXYZ")
-      .map(function(x) {
+      .map(function (x) {
         return x[Math.floor(Math.random() * x.length)];
       })
       .join("") +
     Array(2)
       .fill("0123456789")
-      .map(function(x) {
+      .map(function (x) {
         return x[Math.floor(Math.random() * x.length)];
       })
       .join("") +
     Array(2)
       .fill("abcdefghijklmnopqrstuvwxyz")
-      .map(function(x) {
+      .map(function (x) {
         return x[Math.floor(Math.random() * x.length)];
       })
       .join("")
@@ -50,7 +55,7 @@ const validCognitoFilters = [
   "preferred_username",
   "cognito:user_status", // (called Status in the Console) (case-insensitive)
   "status", // (called Enabled in the Console) (case-sensitive)
-  "sub"
+  "sub",
 ];
 const standardCognitoAttributes = [
   "address",
@@ -69,7 +74,7 @@ const standardCognitoAttributes = [
   "profile",
   "updated_at",
   "website",
-  "zoneinfo"
+  "zoneinfo",
 ];
 async function deleteUser(username, userPoolId) {
   if (!username) {
@@ -77,33 +82,33 @@ async function deleteUser(username, userPoolId) {
   }
   const params = {
     UserPoolId: userPoolId,
-    Username: username
+    Username: username,
   };
-  return await cidp.adminDeleteUser(params).promise();
+  return await getCISP().adminDeleteUser(params).promise();
 }
 async function findUsersByPhoneNumber(phoneNumber, userPoolId) {
   const goodPhoneNumber = cleanPhoneNumber(phoneNumber);
   const params = {
     UserPoolId: userPoolId,
-    Filter: `phone_number="${goodPhoneNumber}"`
+    Filter: `phone_number="${goodPhoneNumber}"`,
   };
-  const { Users = [] } = await cidp.listUsers(params).promise();
+  const { Users = [] } = await getCISP().listUsers(params).promise();
   return Users;
 }
 async function findUsersByEmail(email, userPoolId) {
   const params = {
     UserPoolId: userPoolId,
-    Filter: `email="${email}"`
+    Filter: `email="${email}"`,
   };
-  const { Users = [] } = await cidp.listUsers(params).promise();
+  const { Users = [] } = await getCISP().listUsers(params).promise();
   return Users;
 }
 async function findUsersByPreferredUsername(username, userPoolId) {
   const params = {
     UserPoolId: userPoolId,
-    Filter: `preferred_username="${username}"`
+    Filter: `preferred_username="${username}"`,
   };
-  const { Users = [] } = await cidp.listUsers(params).promise();
+  const { Users = [] } = await getCISP().listUsers(params).promise();
   return Users;
 }
 class CognitoHandler {
@@ -122,7 +127,7 @@ class CognitoHandler {
       emailVerified,
       phoneVerified,
       username,
-      ignoreEmailInvitation
+      ignoreEmailInvitation,
     },
     userPoolId
   ) {
@@ -145,9 +150,9 @@ class CognitoHandler {
       email && { value: email, field: "email" },
       preferredUsername && {
         value: preferredUsername,
-        field: "preferred_username"
-      }
-    ].map(o => {
+        field: "preferred_username",
+      },
+    ].map((o) => {
       if (!o) return [];
       const { field, value } = o;
       return this.findUsers(field, value);
@@ -183,7 +188,7 @@ class CognitoHandler {
     if (preferredUsername) {
       attributes.push({
         Name: "preferred_username",
-        Value: preferredUsername
+        Value: preferredUsername,
       });
     }
     if (goodPhoneNumber) {
@@ -195,13 +200,13 @@ class CognitoHandler {
     const userObj = {
       UserPoolId: userPoolId,
       Username: username,
-      UserAttributes: attributes
+      UserAttributes: attributes,
     };
     if (ignoreEmailInvitation) {
       userObj.MessageAction = "SUPPRESS";
     }
 
-    const user = await cidp.adminCreateUser(userObj).promise();
+    const user = await getCISP().adminCreateUser(userObj).promise();
     this.username = userObj.Username;
     this.userPoolId = userPoolId;
     return this;
@@ -210,7 +215,7 @@ class CognitoHandler {
     const userAttributes = Object.entries(updates).map(([key, value]) => {
       return {
         Name: key,
-        Value: value
+        Value: value,
       };
     });
     if (!userAttributes.length) {
@@ -222,9 +227,9 @@ class CognitoHandler {
     const params = {
       UserAttributes: userAttributes,
       UserPoolId: this.userPoolId,
-      Username: this.username
+      Username: this.username,
     };
-    const results = await cidp.adminUpdateUserAttributes(params).promise();
+    const results = await getCISP().adminUpdateUserAttributes(params).promise();
     return this;
   }
   async get(key, def) {
@@ -257,9 +262,9 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Username: this.username
+      Username: this.username,
     };
-    const user = await cidp.adminGetUser(params).promise();
+    const user = await getCISP().adminGetUser(params).promise();
     const { UserAttributes = [] } = user || {};
     const attributes = UserAttributes.reduce((acc, { Name, Value }) => {
       acc[Name] = Value;
@@ -281,10 +286,10 @@ class CognitoHandler {
       UserPoolId: this.userPoolId,
       Username: this.username,
       Permanent: isPermanentPassword,
-      Password: makePassword()
+      Password: makePassword(),
     };
     await this.globalSignOut();
-    await cidp.adminSetUserPassword(params).promise();
+    await getCISP().adminSetUserPassword(params).promise();
     return params.Password;
   }
   async addFederatedAuth() {}
@@ -295,9 +300,9 @@ class CognitoHandler {
     const params = {
       UserPoolId: this.userPoolId,
       Username: this.username,
-      SMSMfaSettings: { Enabled: true, PreferredMFA: true }
+      SMSMfaSettings: { Enabled: true, PreferredMFA: true },
     };
-    await cidp.adminSetUserMFAPreference(params).promise();
+    await getCISP().adminSetUserMFAPreference(params).promise();
   }
   async disableMFA() {
     if (!this.username) {
@@ -306,9 +311,9 @@ class CognitoHandler {
     const params = {
       UserPoolId: this.userPoolId,
       Username: this.username,
-      SMSMfaSettings: { Enabled: false }
+      SMSMfaSettings: { Enabled: false },
     };
-    await cidp.adminSetUserMFAPreference(params).promise();
+    await getCISP().adminSetUserMFAPreference(params).promise();
   }
   async enable() {
     if (!this.username) {
@@ -316,10 +321,10 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Username: this.username
+      Username: this.username,
     };
 
-    await cidp.adminEnableUser(params).promise();
+    await getCISP().adminEnableUser(params).promise();
     return true;
   }
   async disable() {
@@ -328,11 +333,11 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Username: this.username
+      Username: this.username,
     };
 
     await this.globalSignOut();
-    await cidp.adminDisableUser(params).promise();
+    await getCISP().adminDisableUser(params).promise();
   }
   async globalSignOut() {
     if (!this.username) {
@@ -340,9 +345,9 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Username: this.username
+      Username: this.username,
     };
-    await cidp.adminUserGlobalSignOut(params).promise();
+    await getCISP().adminUserGlobalSignOut(params).promise();
   }
   async findUsers(key, value, startsWith = false) {
     if (!validCognitoFilters.includes(key)) {
@@ -353,9 +358,9 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Filter: `${key}${startsWith ? "^=" : "="}"${value}"`
+      Filter: `${key}${startsWith ? "^=" : "="}"${value}"`,
     };
-    const { Users = [] } = await cidp.listUsers(params).promise();
+    const { Users = [] } = await getCISP().listUsers(params).promise();
     return Users;
   }
   async delete(username) {
@@ -365,9 +370,9 @@ class CognitoHandler {
     }
     const params = {
       UserPoolId: this.userPoolId,
-      Username: username
+      Username: username,
     };
-    await cidp.adminDeleteUser(params).promise();
+    await getCISP().adminDeleteUser(params).promise();
     return this;
   }
 }
@@ -377,5 +382,6 @@ export {
   deleteUser,
   findUsersByEmail,
   findUsersByPhoneNumber,
-  findUsersByPreferredUsername
+  findUsersByPreferredUsername,
+  setCISPParams,
 };
