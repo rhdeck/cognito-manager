@@ -272,13 +272,13 @@ class CognitoHandler {
     }, {});
     return attributes;
   }
-  async setPermanentPassword() {
-    return this.setPassword(true);
+  async setPermanentPassword(newPassword) {
+    return this.setPassword(newPassword, true);
   }
-  async setTemporaryPassword() {
-    return this.setPassword(false);
+  async setTemporaryPassword(newPassword) {
+    return this.setPassword(newPassword, false);
   }
-  async setPassword(isPermanentPassword) {
+  async setPassword(newPassword, isPermanentPassword) {
     if (!this.username) {
       throw new Error("Cognito username is required");
     }
@@ -286,7 +286,7 @@ class CognitoHandler {
       UserPoolId: this.userPoolId,
       Username: this.username,
       Permanent: isPermanentPassword,
-      Password: makePassword(),
+      Password: newPassword || makePassword(),
     };
     await this.globalSignOut();
     await getCISP().adminSetUserPassword(params).promise();
