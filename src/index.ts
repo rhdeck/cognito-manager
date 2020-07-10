@@ -1,10 +1,14 @@
 import { CognitoIdentityServiceProvider } from "aws-sdk";
-let defaultParams = null;
-const setCISPParams = (newParams) => {
+let defaultParams: CognitoIdentityServiceProvider.ClientConfiguration;
+
+const setCISPParams = (
+  newParams?: CognitoIdentityServiceProvider.ClientConfiguration
+) => {
   defaultParams = newParams;
 };
-const getCISP = (params = defaultParams) =>
-  new CognitoIdentityServiceProvider(params);
+const getCISP = (
+  params: CognitoIdentityServiceProvider.ClientConfiguration = defaultParams
+) => new CognitoIdentityServiceProvider(params);
 function makePassword() {
   return (
     Array(4)
@@ -33,7 +37,7 @@ function makePassword() {
       .join("")
   );
 }
-function cleanPhoneNumber(phoneNumber) {
+function cleanPhoneNumber(phoneNumber: string) {
   if (!phoneNumber) return phoneNumber;
   phoneNumber = phoneNumber.replace(/\s/g, "");
   phoneNumber = phoneNumber.replace(/[-()]/g, "");
@@ -57,6 +61,17 @@ const validCognitoFilters = [
   "status", // (called Enabled in the Console) (case-sensitive)
   "sub",
 ];
+type cognitoFilter =
+  | "username"
+  | "email"
+  | "phone_number"
+  | "name"
+  | "given_name"
+  | "family_name"
+  | "preferred_username"
+  | "cognito:user_status" // (called Status in the Console) (case-insensitive)
+  | "status" // (called Enabled in the Console) (case-sensitive)
+  | "sub";
 const standardCognitoAttributes = [
   "address",
   "birthdate",
@@ -76,17 +91,14 @@ const standardCognitoAttributes = [
   "website",
   "zoneinfo",
 ];
-async function deleteUser(username, userPoolId) {
-  if (!username) {
-    throw new Error("Cognito username is required");
-  }
+async function deleteUser(username: string, userPoolId: string) {
   const params = {
     UserPoolId: userPoolId,
     Username: username,
   };
-  return await getCISP().adminDeleteUser(params).promise();
+  await getCISP().adminDeleteUser(params).promise();
 }
-async function findUsersByPhoneNumber(phoneNumber, userPoolId) {
+async function findUsersByPhoneNumber(phoneNumber: string, userPoolId: string) {
   const goodPhoneNumber = cleanPhoneNumber(phoneNumber);
   const params = {
     UserPoolId: userPoolId,
@@ -95,7 +107,7 @@ async function findUsersByPhoneNumber(phoneNumber, userPoolId) {
   const { Users = [] } = await getCISP().listUsers(params).promise();
   return Users;
 }
-async function findUsersByEmail(email, userPoolId) {
+async function findUsersByEmail(email: string, userPoolId: string) {
   const params = {
     UserPoolId: userPoolId,
     Filter: `email="${email}"`,
@@ -103,7 +115,10 @@ async function findUsersByEmail(email, userPoolId) {
   const { Users = [] } = await getCISP().listUsers(params).promise();
   return Users;
 }
-async function findUsersByPreferredUsername(username, userPoolId) {
+async function findUsersByPreferredUsername(
+  username: string,
+  userPoolId: string
+) {
   const params = {
     UserPoolId: userPoolId,
     Filter: `preferred_username="${username}"`,
@@ -112,7 +127,15 @@ async function findUsersByPreferredUsername(username, userPoolId) {
   return Users;
 }
 class CognitoHandler {
-  constructor({ userPoolId, username }) {
+  protected username: string;
+  protected userPoolId: string;
+  constructor({
+    userPoolId,
+    username,
+  }: {
+    userPoolId: string;
+    username: string;
+  }) {
     if (!userPoolId) {
       throw new Error("UserPoolId is required");
     }
@@ -128,8 +151,16 @@ class CognitoHandler {
       phoneVerified,
       username,
       ignoreEmailInvitation,
+    }: {
+      email: string;
+      preferredUsername: string;
+      phoneNumber: string;
+      emailVerified: boolean;
+      phoneVerified: boolean;
+      username: string;
+      ignoreEmailInvitation: boolean;
     },
-    userPoolId
+    userPoolId: string
   ) {
     if (!userPoolId) userPoolId = this.userPoolId;
     if (!userPoolId) {
@@ -146,11 +177,14 @@ class CognitoHandler {
       );
     }
     const findUsers = [
-      goodPhoneNumber && { value: goodPhoneNumber, field: "phone_number" },
-      email && { value: email, field: "email" },
+      goodPhoneNumber && {
+        value: goodPhoneNumber,
+        field: <cognitoFilter>"phone_number",
+      },
+      email && { value: email, field: <cognitoFilter>"email" },
       preferredUsername && {
         value: preferredUsername,
-        field: "preferred_username",
+        field: <cognitoFilter>"preferred_username",
       },
     ].map((o) => {
       if (!o) return [];
@@ -197,7 +231,7 @@ class CognitoHandler {
         attributes.push({ Name: "phone_number_verified", Value: "True" });
       }
     }
-    const userObj = {
+    const userObj: CognitoIdentityServiceProvider.AdminCreateUserRequest = {
       UserPoolId: userPoolId,
       Username: username,
       UserAttributes: attributes,
@@ -211,8 +245,10 @@ class CognitoHandler {
     this.userPoolId = userPoolId;
     return this;
   }
-  async _update(updates) {
-    const userAttributes = Object.entries(updates).map(([key, value]) => {
+  async _update(updates: { [key: string]: string }) {
+    const userAttributes: CognitoIdentityServiceProvider.AttributeListType = Object.entries(
+      updates
+    ).map(([key, value]) => {
       return {
         Name: key,
         Value: value,
@@ -224,7 +260,7 @@ class CognitoHandler {
     if (!this.username) {
       throw new Error("Cognito username is required");
     }
-    const params = {
+    const params: CognitoIdentityServiceProvider.AdminUpdateUserAttributesRequest = {
       UserAttributes: userAttributes,
       UserPoolId: this.userPoolId,
       Username: this.username,
@@ -232,20 +268,14 @@ class CognitoHandler {
     const results = await getCISP().adminUpdateUserAttributes(params).promise();
     return this;
   }
-  async get(key, def) {
+  async get(key: string, def?: string): Promise<string | undefined> {
     //@NOTE: Using getaAll because I did not see
     //a way to get a single attribute from a user
     //in the cidp API
     const attributes = await this.getAll();
     return attributes[key] || def;
   }
-  async set(key, value) {
-    if (typeof value !== "string") {
-      throw new Error(
-        "Cognito Attribute values must be type of string but received " +
-          typeof value
-      );
-    }
+  async set(key: string, value: string) {
     if (
       !standardCognitoAttributes.includes(key) &&
       !key.startsWith("custom:")
@@ -256,33 +286,37 @@ class CognitoHandler {
     }
     return this._update({ [key]: value });
   }
-  async getAll() {
+  async getAll(): Promise<{ [key: string]: string }> {
     if (!this.username) {
       throw new Error("Cognito username is required");
     }
-    const params = {
-      UserPoolId: this.userPoolId,
-      Username: this.username,
-    };
-    const user = await getCISP().adminGetUser(params).promise();
-    const { UserAttributes = [] } = user || {};
-    const attributes = UserAttributes.reduce((acc, { Name, Value }) => {
-      acc[Name] = Value;
-      return acc;
-    }, {});
-    return attributes;
+    try {
+      const params = {
+        UserPoolId: this.userPoolId,
+        Username: this.username,
+      };
+      const user = await getCISP().adminGetUser(params).promise();
+      const { UserAttributes = [] } = user || {};
+      const attributes = UserAttributes.reduce((acc, { Name, Value }) => {
+        acc[Name] = Value;
+        return acc;
+      }, <{ [key: string]: string }>{});
+      return attributes;
+    } catch (e) {
+      throw e;
+    }
   }
-  async setPermanentPassword(newPassword) {
+  async setPermanentPassword(newPassword: string) {
     return this.setPassword(newPassword, true);
   }
-  async setTemporaryPassword(newPassword) {
+  async setTemporaryPassword(newPassword: string) {
     return this.setPassword(newPassword, false);
   }
-  async setPassword(newPassword, isPermanentPassword) {
-    if (!this.username) {
-      throw new Error("Cognito username is required");
-    }
-    const params = {
+  async setPassword(
+    newPassword: string,
+    isPermanentPassword: boolean
+  ): Promise<void> {
+    const params: CognitoIdentityServiceProvider.AdminSetUserPasswordRequest = {
       UserPoolId: this.userPoolId,
       Username: this.username,
       Permanent: isPermanentPassword,
@@ -290,7 +324,6 @@ class CognitoHandler {
     };
     await this.globalSignOut();
     await getCISP().adminSetUserPassword(params).promise();
-    return params.Password;
   }
   async addFederatedAuth() {}
   async enableMFA() {
@@ -325,7 +358,6 @@ class CognitoHandler {
     };
 
     await getCISP().adminEnableUser(params).promise();
-    return true;
   }
   async disable() {
     if (!this.username) {
@@ -335,27 +367,17 @@ class CognitoHandler {
       UserPoolId: this.userPoolId,
       Username: this.username,
     };
-
     await this.globalSignOut();
     await getCISP().adminDisableUser(params).promise();
   }
   async globalSignOut() {
-    if (!this.username) {
-      throw new Error("Cognito username is required");
-    }
     const params = {
       UserPoolId: this.userPoolId,
       Username: this.username,
     };
     await getCISP().adminUserGlobalSignOut(params).promise();
   }
-  async findUsers(key, value, startsWith = false) {
-    if (!validCognitoFilters.includes(key)) {
-      throw new Error(
-        "Invlaid key. Supported filters are ",
-        validCognitoFilters.join(", ")
-      );
-    }
+  async findUsers(key: cognitoFilter, value: string, startsWith = false) {
     const params = {
       UserPoolId: this.userPoolId,
       Filter: `${key}${startsWith ? "^=" : "="}"${value}"`,
@@ -363,11 +385,7 @@ class CognitoHandler {
     const { Users = [] } = await getCISP().listUsers(params).promise();
     return Users;
   }
-  async delete(username) {
-    if (!username) username = this.username;
-    if (!username) {
-      throw new Error("Cognito username is required");
-    }
+  async delete(username: string = this.username) {
     const params = {
       UserPoolId: this.userPoolId,
       Username: username,
@@ -376,7 +394,6 @@ class CognitoHandler {
     return this;
   }
 }
-
 export {
   CognitoHandler,
   deleteUser,
