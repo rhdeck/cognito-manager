@@ -147,20 +147,20 @@ class CognitoHandler {
       email,
       preferredUsername,
       phoneNumber,
-      emailVerified,
-      phoneVerified,
+      emailVerified = false,
+      phoneVerified = false,
       username,
-      ignoreEmailInvitation,
+      ignoreEmailInvitation = false,
     }: {
-      email: string;
-      preferredUsername: string;
-      phoneNumber: string;
+      email?: string;
+      preferredUsername?: string;
+      phoneNumber?: string;
       emailVerified: boolean;
       phoneVerified: boolean;
       username: string;
       ignoreEmailInvitation: boolean;
     },
-    userPoolId: string
+    userPoolId?: string
   ) {
     if (!userPoolId) userPoolId = this.userPoolId;
     if (!userPoolId) {
